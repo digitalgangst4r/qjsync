@@ -105,7 +105,7 @@ Requires **Python 3.11+** and **PostgreSQL**.
 
 ```bash
 # 1. Install
-git clone https://github.com/sepiolmike-max/qjsync.git && cd qjsync
+git clone https://github.com/digitalgangst4r/qjsync.git && cd qjsync
 python -m venv .venv && . .venv/bin/activate
 pip install -e .                      # add ".[dev]" for tests/lint
 
