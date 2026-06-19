@@ -111,3 +111,44 @@ def test_nonexistent_file(tmp_path: Path) -> None:
     with pytest.raises(ConfigError) as exc_info:
         load_config(tmp_path / "does-not-exist.yml")
     assert "not found" in str(exc_info.value)
+
+
+# --------------------------------------------------------------------------- #
+# environment-variable substitution (${VAR} / ${VAR:-default})
+# --------------------------------------------------------------------------- #
+def test_env_substitution_uses_environment(
+    tmp_path: Path, sample_config_dict: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "PRODSEC")
+    body = copy.deepcopy(sample_config_dict)
+    body["jira"]["project"] = "${JIRA_PROJECT_KEY:-QVULN}"
+    cfg = load_config(_write(tmp_path / "rules.yml", body))
+    assert cfg.jira.project == "PRODSEC"  # env wins over the default
+
+
+def test_env_substitution_falls_back_to_default(
+    tmp_path: Path, sample_config_dict: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("JIRA_PROJECT_KEY", raising=False)
+    body = copy.deepcopy(sample_config_dict)
+    body["jira"]["project"] = "${JIRA_PROJECT_KEY:-FALLBACK}"
+    cfg = load_config(_write(tmp_path / "rules.yml", body))
+    assert cfg.jira.project == "FALLBACK"
+
+
+def test_env_substitution_missing_without_default_raises(
+    tmp_path: Path, sample_config_dict: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("QJSYNC_UNSET_VAR", raising=False)
+    body = copy.deepcopy(sample_config_dict)
+    body["jira"]["project"] = "${QJSYNC_UNSET_VAR}"  # no default -> fail fast
+    with pytest.raises(ConfigError, match="QJSYNC_UNSET_VAR"):
+        load_config(_write(tmp_path / "rules.yml", body))
+
+
+def test_env_substitution_leaves_plain_values_untouched(
+    tmp_path: Path, sample_config_dict: dict[str, Any]
+) -> None:
+    # A value without ${...} is returned verbatim — regex patterns, tags, etc. survive.
+    cfg = load_config(_write(tmp_path / "rules.yml", sample_config_dict))
+    assert cfg.jira.project == "QVULN"

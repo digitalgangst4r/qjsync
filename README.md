@@ -108,7 +108,7 @@ Only bands **≥ Medium** become Jira issues; **Low** is classified but not tick
 label by context — e.g. PCI-in-scope detections get a `pci-scope` label, a business unit routes to
 its own Jira project — without ever changing the computed band.
 
-Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/FIELD_MAPPING.md`](docs/FIELD_MAPPING.md) · [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) · a commented [`examples/rules.yml`](examples/rules.yml).
+Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/JIRA_SETUP.md`](docs/JIRA_SETUP.md) · [`docs/FIELD_MAPPING.md`](docs/FIELD_MAPPING.md) · [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) · a commented [`examples/rules.yml`](examples/rules.yml).
 
 ## Quickstart
 
@@ -123,10 +123,13 @@ pip install -e .                      # add ".[dev]" for tests/lint
 # 2. Secrets (gitignored) — NEVER in rules.yml
 cp .env.example .env                  # fill in Qualys + Jira creds + DB URL
 
-# 3. Rules
-cp examples/rules.yml rules.yml       # set your project key + exposure tag + bands
+# 3. Jira project + custom fields (see docs/JIRA_SETUP.md)
+python scripts/bootstrap_jira_fields.py --dry-run   # then drop --dry-run to create
 
-# 4. Bring up state + run
+# 4. Rules
+cp examples/rules.yml rules.yml       # set your project key (or $JIRA_PROJECT_KEY) + tags + bands
+
+# 5. Bring up state + run
 docker compose -f docker/docker-compose.yml up -d postgres
 qjsync init-db
 qjsync validate-config -c rules.yml

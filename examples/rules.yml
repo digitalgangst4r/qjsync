@@ -16,8 +16,13 @@
 version: 1
 
 jira:
-  project: "QVULN"
-  issue_type: "Bug"
+  # Project key + issue type. Set them literally, or pull from the environment with
+  # ${VAR:-default} so the SAME ruleset targets different projects per environment:
+  #   export JIRA_PROJECT_KEY=PRODSEC   ->  project resolves to PRODSEC
+  # Unset -> the default after ":-" is used. The custom fields this issue type needs
+  # are listed in docs/JIRA_SETUP.md (and created by scripts/bootstrap_jira_fields.py).
+  project: "${JIRA_PROJECT_KEY:-QVULN}"
+  issue_type: "${JIRA_ISSUE_TYPE:-Bug}"
   sticky_resolutions: ["Won't Do", "Won't Fix", "Risk Accepted"]
 
 qualys:
