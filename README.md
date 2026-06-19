@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/digitalgangst4r/qjsync/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/digitalgangst4r/qjsync/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg">
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-blue.svg">
   <img alt="Qualys" src="https://img.shields.io/badge/source-Qualys%20VMDR-1f6feb.svg">

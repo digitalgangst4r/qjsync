@@ -1,0 +1,76 @@
+# Example: scope a sync to specific hosts (bounded test run).
+# Set qualys.query.extra.ids to real Host IDs. Full commented config: examples/rules.yml
+version: 1
+jira:
+  project: QVULN
+  issue_type: Bug
+  sticky_resolutions:
+  - Won't Do
+  - Won't Fix
+  - Risk Accepted
+qualys:
+  module: vm
+  incremental_overlap_minutes: 30
+  asset_criticality_tag_pattern: ACS-(\d)
+  query:
+    severities: 4-5
+    status: Active,New
+    show_igs: 0
+    show_tags: 1
+    show_qds: 1
+    show_qds_factors: 1
+    truncation_limit: 1000
+    extra:
+      ids: 12345,67890
+drift:
+  below_threshold: keep_open
+purge:
+  agent_grace_syncs: 2
+  network_scan_grace_days: 30
+  require_full_sync: true
+  reevaluate_on_return: true
+primary_key:
+  port_sentinel: none
+  include_unique_vuln_id: false
+logging:
+  level: INFO
+  format: json
+prioritization:
+  qds_bands:
+    highest: 90
+    high: 70
+    medium: 60
+  highest_requires_high_base: true
+  materialize_min_band: Medium
+  skip_when:
+    any:
+    - signal: vuln_type
+      op: ==
+      value: Information
+    - signal: is_ignored
+      op: ==
+      value: 1
+    - signal: is_disabled
+      op: ==
+      value: 1
+  modifiers:
+  - name: internet-facing
+    when:
+      signal: asset_tags
+      op: contains
+      value: Internet Facing Assets
+    shift: 1
+    label: internet-facing
+    caps_at_high: true
+  - name: active-exploit
+    when:
+      signal: has_exploit
+      op: ==
+      value: true
+    shift: 1
+  - name: local-category
+    when:
+      signal: category
+      op: ==
+      value: Local
+    shift: -1

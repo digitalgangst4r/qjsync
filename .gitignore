@@ -18,10 +18,8 @@ htmlcov/
 *.local.yml
 secrets*.yml
 
-# Local working configs (the canonical example is examples/rules.yml)
+# Local working config (the canonical example is examples/rules.yml)
 /rules.yml
-/test-rules.yml
-/internet-rules.yml
 
 # Consulting / client-specific material — kept out of the public repo
 /private/
