@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets / local config
+.env
+*.local.yml
+secrets*.yml
+
+# Local working configs (the canonical example is examples/rules.yml)
+/rules.yml
+/test-rules.yml
+/internet-rules.yml
+
+# Consulting / client-specific material — kept out of the public repo
+/private/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

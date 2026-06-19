@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qjsync"
+version = "0.1.0"
+description = "A transparent connector syncing Qualys VMDR vulnerabilities into Jira Cloud with configurable prioritisation and KnowledgeBase enrichment."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [{ name = "qjsync contributors" }]
+keywords = ["qualys", "jira", "vmdr", "vulnerability-management", "trurisk", "qds"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "SQLAlchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.1",
+    "requests>=2.31",
+    "PyYAML>=6.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "responses>=0.25",
+    "mypy>=1.10",
+    "ruff>=0.5",
+    "types-requests",
+    "types-PyYAML",
+]
+
+[project.scripts]
+qjsync = "qjsync.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/qjsync/qjsync"
+Repository = "https://github.com/qjsync/qjsync"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qjsync"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Legacy one-shot provisioning helper; not part of the package.
+"scripts/bootstrap_jira_fields.py" = ["E501", "B007"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+# B008: typer uses function-call defaults. UP042: (str, Enum) is deliberate for
+# JSON/value serialisation interop with pydantic; we don't want StrEnum semantics.
+ignore = ["B008", "UP042"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+packages = ["qjsync"]
+mypy_path = "src"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true

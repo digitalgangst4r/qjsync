@@ -1,0 +1,93 @@
+# qjsync prioritisation — UNIFIED BAND-SHIFT model.
+#
+#   final_band = base_band(QDS) + Σ(±N context modifiers), clamped [skip..Highest]
+#
+# QDS is the trusted base (Qualys already folds RTIs/exposure into it). Context
+# modifiers express how OUR risk appetite differs from Qualys's generic default:
+# exposure, active exploit and local-only reachability each nudge the band, and
+# they STACK. So a mid-QDS detection that is internet-facing AND exploitable rises
+# two bands; a Local one drops one. Nothing low-QDS jumps straight to Highest.
+#
+# Levels: skip < Low < Medium < High < Highest. QDS maps to Highest/High/Medium;
+# below `medium` is skip. Low is only reached via a shift.
+#
+# Secrets (Qualys/Jira creds, DB URL) live in the environment / .env, never here.
+
+version: 1
+
+jira:
+  project: "QVULN"
+  issue_type: "Bug"
+  sticky_resolutions: ["Won't Do", "Won't Fix", "Risk Accepted"]
+
+qualys:
+  module: vm
+  incremental_overlap_minutes: 30
+  # ACS isn't in HLD 2.0; this environment encodes it as tags like "ACS-4".
+  asset_criticality_tag_pattern: "ACS-(\\d)"
+  query:
+    severities: "2-5"
+    status: "New,Active,Re-Opened,Fixed"   # Fixed required so remediation closes issues
+    show_igs: 0
+    show_tags: 1                           # asset_tags (exposure) + ACS tags
+    show_qds: 1                            # QDS — the trusted base score
+    show_qds_factors: 1                    # RTIs (active-exploit modifier + top-RTI label)
+    truncation_limit: 1000
+
+drift:
+  below_threshold: keep_open
+
+purge:
+  agent_grace_syncs: 2
+  network_scan_grace_days: 30
+  require_full_sync: true
+  reevaluate_on_return: true
+
+primary_key:
+  port_sentinel: "none"
+  include_unique_vuln_id: false
+
+logging:
+  level: INFO
+  format: json
+
+prioritization:
+  # Base band straight from QDS. Below `medium` -> skip. floor=60 (50/60 don't
+  # change volume — the floor only redistributes priority; see dry-run). 70 is
+  # forbidden: it collides with `high` and collapses the Medium band.
+  qds_bands:
+    highest: 90
+    high: 70
+    medium: 60
+
+  # Lever B: Highest requires the QDS base to already be High (qds >= high=70).
+  # No modifier can manufacture a Highest from a Medium/skip base.
+  highest_requires_high_base: true
+
+  # Lever D-narrow: only bands >= Medium become Jira issues. Low is still
+  # CLASSIFIED (recorded in state) so a later promotion creates the ticket — it
+  # just doesn't pollute Jira with low-priority noise. See docs/LIFECYCLE.md.
+  materialize_min_band: Medium
+
+  # Noise never reaches Jira (pre-filter -> skip).
+  skip_when:
+    any:
+      - { signal: vuln_type, op: "==", value: "Information" }
+      - { signal: is_ignored, op: "==", value: 1 }
+      - { signal: is_disabled, op: "==", value: 1 }
+
+  # Context modifiers — each shifts the QDS band by `shift`; they STACK; result is
+  # clamped to [skip, Highest]. PCI and the top RTI are surfaced as LABELS by the
+  # Jira mapper (visibility/triage), not as band modifiers.
+  modifiers:
+    - name: internet-facing       # reachability turns theoretical risk into real risk
+      when: { signal: asset_tags, op: contains, value: "Internet Facing Assets" }
+      shift: 1
+      label: internet-facing
+      caps_at_high: true          # Lever C: exposure alone tops out at High, never Highest
+    - name: active-exploit        # active/public exploit > Qualys's generic default
+      when: { signal: has_exploit, op: "==", value: true }
+      shift: 1
+    - name: local-category        # local-only reachability is lower risk
+      when: { signal: category, op: "==", value: "Local" }
+      shift: -1

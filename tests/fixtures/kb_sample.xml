@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Sanitised sample mirroring the real qg3 KnowledgeBase structure.
+     QID 105413: CVSS v2 only, no CVEs, non-patchable, PCI, with THREAT_INTELLIGENCE.
+     QID 38170:  CVSS v2 + v3, CVEs, patchable. -->
+<KNOWLEDGE_BASE_VULN_LIST_OUTPUT>
+  <RESPONSE>
+    <DATETIME>2026-06-19T03:00:00Z</DATETIME>
+    <VULN_LIST>
+      <VULN>
+        <QID>105413</QID>
+        <VULN_TYPE>Vulnerability</VULN_TYPE>
+        <SEVERITY_LEVEL>5</SEVERITY_LEVEL>
+        <TITLE><![CDATA[EOL/Obsolete Software: Oracle/Sun Java Development Kit (JDK)]]></TITLE>
+        <CATEGORY>Security Policy</CATEGORY>
+        <LAST_SERVICE_MODIFICATION_DATETIME>2025-06-24T11:53:40Z</LAST_SERVICE_MODIFICATION_DATETIME>
+        <PUBLISHED_DATETIME>2011-08-29T21:02:02Z</PUBLISHED_DATETIME>
+        <PATCHABLE>0</PATCHABLE>
+        <DIAGNOSIS><![CDATA[The installed JDK has reached end of life and no longer receives security updates.]]></DIAGNOSIS>
+        <CONSEQUENCE><![CDATA[Attackers may exploit unpatched vulnerabilities in the obsolete runtime.]]></CONSEQUENCE>
+        <SOLUTION><![CDATA[Upgrade to a supported JDK release or remove the software.]]></SOLUTION>
+        <CVSS>
+          <BASE>10</BASE>
+          <TEMPORAL>7.4</TEMPORAL>
+          <VECTOR_STRING>AV:N/AC:L/Au:N/C:C/I:C/A:C</VECTOR_STRING>
+        </CVSS>
+        <PCI_FLAG>1</PCI_FLAG>
+        <THREAT_INTELLIGENCE>
+          <THREAT_INTEL id="4">High_Lateral_Movement</THREAT_INTEL>
+          <THREAT_INTEL id="6">High_Data_Loss</THREAT_INTEL>
+          <THREAT_INTEL id="7">Denial_of_Service</THREAT_INTEL>
+          <THREAT_INTEL id="8">No_Patch</THREAT_INTEL>
+        </THREAT_INTELLIGENCE>
+      </VULN>
+      <VULN>
+        <QID>38170</QID>
+        <VULN_TYPE>Vulnerability</VULN_TYPE>
+        <SEVERITY_LEVEL>4</SEVERITY_LEVEL>
+        <TITLE><![CDATA[SSL/TLS Server Supports Deprecated Protocol]]></TITLE>
+        <CATEGORY>General Remote Services</CATEGORY>
+        <LAST_SERVICE_MODIFICATION_DATETIME>2025-02-10T10:00:00Z</LAST_SERVICE_MODIFICATION_DATETIME>
+        <PUBLISHED_DATETIME>2016-05-01T10:00:00Z</PUBLISHED_DATETIME>
+        <PATCHABLE>1</PATCHABLE>
+        <DIAGNOSIS><![CDATA[The server supports a deprecated TLS protocol version.]]></DIAGNOSIS>
+        <CONSEQUENCE><![CDATA[An attacker may be able to decrypt or tamper with traffic.]]></CONSEQUENCE>
+        <SOLUTION><![CDATA[Disable the deprecated protocol and enable TLS 1.2+.]]></SOLUTION>
+        <CVSS>
+          <BASE>7.4</BASE>
+          <TEMPORAL>6.4</TEMPORAL>
+        </CVSS>
+        <CVSS_V3>
+          <BASE>7.5</BASE>
+          <TEMPORAL>6.5</TEMPORAL>
+        </CVSS_V3>
+        <PCI_FLAG>0</PCI_FLAG>
+        <CVE_LIST>
+          <CVE><ID>CVE-2016-2183</ID><URL>https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2016-2183</URL></CVE>
+          <CVE><ID>CVE-2014-3566</ID><URL>https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-3566</URL></CVE>
+        </CVE_LIST>
+        <THREAT_INTELLIGENCE>
+          <THREAT_INTEL id="5">Exploit_Public</THREAT_INTEL>
+        </THREAT_INTELLIGENCE>
+      </VULN>
+    </VULN_LIST>
+  </RESPONSE>
+</KNOWLEDGE_BASE_VULN_LIST_OUTPUT>

@@ -1,0 +1,48 @@
+# docker-compose for a self-hosted qjsync deployment.
+#
+#   docker compose -f docker/docker-compose.yml up -d postgres   # state store
+#   docker compose -f docker/docker-compose.yml run --rm qjsync init-db
+#   docker compose -f docker/docker-compose.yml up qjsync        # one sync pass
+#
+# Secrets come from ../.env (gitignored; copy from ../.env.example). Non-secret
+# config lives in ../examples/rules.yml, mounted read-only into the container.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: qjsync
+      POSTGRES_PASSWORD: qjsync
+      POSTGRES_DB: qjsync
+    volumes:
+      - qjsync_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` succeeds only once the server accepts connections, so
+      # depends_on: condition: service_healthy gates qjsync on a live DB.
+      test: ["CMD-SHELL", "pg_isready -U qjsync -d qjsync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  qjsync:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Qualys/Jira secrets (the DB url here is overridden below to point at the
+    # compose postgres service rather than localhost). required: false so
+    # `config`/build still work before you've created ../.env from .env.example.
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      QJSYNC_DATABASE_URL: postgresql+psycopg://qjsync:qjsync@postgres:5432/qjsync
+    volumes:
+      - ../examples/rules.yml:/app/rules.yml:ro
+    command: sync --mode incremental -c /app/rules.yml
+    restart: "no"
+
+volumes:
+  qjsync_pgdata:

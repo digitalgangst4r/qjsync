@@ -1,0 +1,23 @@
+# Keep the build context (repo root) small and free of secrets/cruft.
+.venv
+venv
+.git
+.gitignore
+__pycache__
+*.py[cod]
+.env
+*.local.yml
+secrets*.yml
+tests
+*.egg-info
+.eggs
+build
+dist
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+.DS_Store
+.idea
+.vscode
