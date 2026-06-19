@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qjsync"
-version = "0.1.0"
+version = "0.2.0"
 description = "A transparent connector syncing Qualys VMDR vulnerabilities into Jira Cloud with configurable prioritisation and KnowledgeBase enrichment."
 readme = "README.md"
 license = { text = "Apache-2.0" }
