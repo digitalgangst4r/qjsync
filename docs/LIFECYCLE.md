@@ -29,13 +29,21 @@ skip purge so the 4h delta never looks like mass disappearance.
 ## Prioritisation & materialisation (band-shift model)
 
 Priority is `final = base_band(QDS) + Σ(±N modifiers)`, clamped `[skip, Highest]`
-(see `docs/ARCHITECTURE.md`). Two hygiene gates protect the top band:
+(see `docs/ARCHITECTURE.md`). Modifiers span several dimensions — threat-intel
+(actively-attacked, ransomware, wormable, EPSS), exposure (internet-facing/DMZ/EASM),
+asset criticality, SLA age, and reachability down-weights — and stack. Two hygiene
+gates protect the top band, with one deliberate escape hatch:
 
 - **Lever B** — Highest requires the QDS *base* to already be High (qds ≥ `high`);
   no modifier manufactures a Highest from a Medium/skip base.
 - **Lever C** — a `caps_at_high` modifier (internet-facing) can lift at most to
   High; exposure alone never reaches Highest. Only a non-capped contributor
   (active exploit) or a base already in the Highest band gets there.
+- **Bypass** — a modifier flagged `bypasses_highest_gate` (confirmed in-the-wild
+  exploitation / KEV-grade) **waives Levers B + C**, so "patch now" legitimately
+  reaches Highest from any base. This is the *only* way a sub-High base becomes
+  Highest, and it is reserved for confirmed active attack — generic "exploit
+  available" stays gated.
 
 **Materialisation (Lever D-narrow).** Only bands **≥ `materialize_min_band`**
 (default **Medium**) become Jira issues. Lower bands (**Low**) are **classified but

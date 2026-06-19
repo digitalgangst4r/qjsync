@@ -124,7 +124,11 @@ Confirmed against a live VMDR subscription (your POD, e.g. `qualysapi.<pod>.apps
   for host-level QIDs → port-less, sentinel applies).
 - **RTIs:** in `DETECTION/QDS_FACTORS/QDS_FACTOR[name=RTI]` as a comma list, e.g.
   `Denial_of_Service,Remote_Code_Execution,Exploit_Public`. Also in KB
-  `THREAT_INTELLIGENCE`. `has_exploit` unions both.
+  `THREAT_INTELLIGENCE`. `has_exploit` unions both. The canonical model further
+  classifies RTIs into threat-category booleans (`actively_attacked`, `ransomware`,
+  `wormable`, `zero_day`, `easy_exploit`) so modifiers can weight them distinctly.
+- **EPSS:** when present as a `QDS_FACTOR[name=EPSS]`, parsed to a float and exposed
+  as the `epss` signal (0–1 exploitation probability).
 - **ACS:** not an API field; this tenant encodes it as tags (`ACS-4`). Derived
   via `qualys.asset_criticality_tag_pattern` (a host may carry several → MAX wins).
 - **Exposure tag:** the exact applied string is **`Internet Facing Assets`** (also
@@ -164,14 +168,23 @@ detection's `TYPE` ("Confirmed"/"Potential"/"Information").
   on incomplete fetch (purge safety).
 - `refresh_knowledgebase() -> int`.
 
-**`rules/operators.py`** / **`rules/engine.py`** — operator registry (None-safe);
+**`rules/operators.py`** / **`rules/engine.py`** — operator registry (None-safe;
+list `contains` matches an exact element **or a substring within any element**, so
+`asset_tags contains "Falcon"` finds the tag `"SW: CS Falcon Sensor Installed"`);
 `RulesEngine(config).evaluate(merged) -> EvaluationResult` via the **band-shift**
 model: `final = base_band(QDS) + Σ(±N modifier shifts)`, clamped to [skip, Highest].
+Modifiers key off any `signal_context()` signal — threat-intel (`actively_attacked`,
+`ransomware`, `wormable`, `zero_day`, `easy_exploit`, `has_exploit`), `epss`, exposure
+(`asset_tags`), `asset_criticality`, `age_days`, `category`, … — and stack.
 Gates: a `caps_at_high` modifier (exposure) never reaches Highest alone (Lever C);
-Highest requires the QDS base ≥ High when `highest_requires_high_base` (Lever B).
-Only bands ≥ `materialize_min_band` create (action=CREATE); lower bands (Low) are
-classified (priority set) with action=SKIP. `skip_when` short-circuits to skip.
-Routing/labels come from the firing modifiers' labels + `JiraConfig`.
+Highest requires the QDS base ≥ High when `highest_requires_high_base` (Lever B). A
+modifier flagged `bypasses_highest_gate` (confirmed in-the-wild exploitation / KEV)
+**waives both** so "patch now" reaches Highest from any base. Only bands ≥
+`materialize_min_band` create (action=CREATE); lower bands (Low) are classified
+(priority set) with action=SKIP. `skip_when` short-circuits to skip. After scoring,
+an orthogonal first-match `routing` pass may override the destination
+(`project`/`issue_type`/`component`) and add labels **without touching priority**;
+final labels = `JiraConfig` managed label + firing modifiers' labels + route labels.
 
 **`jira/auth.py`** / **`client.py`** / **`adf.py`** / **`mapper.py`** — auth provider
 (basic now, OAuth-ready); REST client with `discover_fields()` (name→id),
@@ -286,8 +299,11 @@ would-close-fixed / would-mark-stale / would-reopen / skipped (per the chosen mo
 - Sync modes (incremental/full) with managed `vm_scan_since`; purge only on full.
 - Material vs telemetry change detection (`material_hash`) to stop write-amplification.
 - Tracking-method-aware purge (agent grace-syncs vs network scan-age days).
-- Band-shift prioritisation (QDS base + stacking ±N modifiers, clamped) with a
-  structured condition AST (no `eval`); Highest hygiene (Levers B + C); Low
-  classified-but-not-materialised (`materialize_min_band`).
+- Band-shift prioritisation (QDS base + stacking ±N multi-dimensional modifiers —
+  threat-intel, EPSS, exposure, asset criticality, SLA age, reachability — clamped)
+  with a structured condition AST (no `eval`); Highest hygiene (Levers B + C) with a
+  `bypasses_highest_gate` escape hatch for confirmed in-the-wild exploitation; Low
+  classified-but-not-materialised (`materialize_min_band`); orthogonal context
+  `routing` (destination + labels) that never alters priority.
 - `requests`/`typer`/pydantic2/SQLAlchemy2/psycopg3; dates kept as text.
 - Primary key `HOST_ID:QID:PORT` with `none` sentinel; `UNIQUE_VULN_ID` optional.

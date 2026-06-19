@@ -109,15 +109,27 @@ def _full_merged() -> MergedVulnerability:
     )
 
 
-def _evaluation(labels: list[str] | None = None) -> EvaluationResult:
+def _evaluation(
+    labels: list[str] | None = None, component: str | None = None
+) -> EvaluationResult:
     return EvaluationResult(
         action=RuleAction.CREATE,
         matched_rule="default",
         priority=JiraPriority.HIGH,
         project="SEC",
         issue_type="Host Vulnerability",
+        component=component,
         labels=labels or [],
     )
+
+
+def test_routing_component_emitted_only_when_set() -> None:
+    mapper = IssueMapper(_field_ids(), _config())
+    # No routing component -> no `components` key (Jira would reject an empty one).
+    assert "components" not in mapper.build_fields(_full_merged(), _evaluation(), "pk")
+    # A routing rule that set a component -> components payload by name.
+    routed = mapper.build_fields(_full_merged(), _evaluation(component="Cloud Platform"), "pk")
+    assert routed["components"] == [{"name": "Cloud Platform"}]
 
 
 def test_full_mapping_present_with_correct_ids() -> None:

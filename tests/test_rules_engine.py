@@ -25,6 +25,7 @@ from qjsync.config.schema import (
     PrioritizationConfig,
     QdsBands,
     QjsyncConfig,
+    RoutingRule,
 )
 from qjsync.models.canonical import (
     Asset,
@@ -69,6 +70,11 @@ def test_in_contains_none_safe() -> None:
     assert OPERATORS["contains"](tags, "Internet Facing Assets") is True
     assert OPERATORS["contains"](None, "x") is False
     assert OPERATORS["not_contains"](["EASM"], "Internet Facing Assets") is True
+    # list `contains` matches a substring within an element too, so a keyword finds a
+    # longer Qualys auto-tag (e.g. "Falcon" inside "SW: CS Falcon Sensor Installed").
+    assert OPERATORS["contains"](["SW: CS Falcon Sensor Installed"], "Falcon") is True
+    assert OPERATORS["contains"](["AMS - LatAM - CMDB - DMZ"], "DMZ") is True
+    assert OPERATORS["contains"](["Internet Facing Assets"], "Zscaler") is False
 
 
 def test_exists_and_matches() -> None:
@@ -91,20 +97,28 @@ def _merged(
     vuln_type: str | None = None,
     is_ignored: int | None = None,
     status: DetectionStatus = DetectionStatus.ACTIVE,
+    epss: float | None = None,
+    asset_criticality: int | None = None,
+    pci_flag: bool = False,
 ) -> MergedVulnerability:
     return MergedVulnerability(
-        asset=Asset(host_id=1, asset_tags=asset_tags or []),
+        asset=Asset(
+            host_id=1, asset_tags=asset_tags or [],
+            asset_criticality_score=asset_criticality,
+        ),
         detection=Detection(
             qid=1, qds=qds, severity=severity, status=status,
             rtis=rtis or [], vuln_type=vuln_type, is_ignored=is_ignored,
+            qds_factors={"EPSS": str(epss)} if epss is not None else {},
         ),
-        kb=KbVuln(qid=1, category=category),
+        kb=KbVuln(qid=1, category=category, pci_flag=pci_flag),
     )
 
 
 def _mod(
     name: str, signal: str, op: str, value: object, shift: int,
     label: str | None = None, caps_at_high: bool = False,
+    bypasses_highest_gate: bool = False,
 ) -> Modifier:
     return Modifier(
         name=name,
@@ -112,6 +126,7 @@ def _mod(
         shift=shift,
         label=label,
         caps_at_high=caps_at_high,
+        bypasses_highest_gate=bypasses_highest_gate,
     )
 
 
@@ -120,11 +135,13 @@ def _engine(
     *,
     qds_bands: QdsBands | None = None,
     skip_when: Condition | None = None,
+    routing: list[RoutingRule] | None = None,
 ) -> RulesEngine:
     p = PrioritizationConfig(
         qds_bands=qds_bands or QdsBands(),
         modifiers=modifiers or [],
         skip_when=skip_when,
+        routing=routing or [],
     )
     return RulesEngine(QjsyncConfig(jira=JiraConfig(project="QVULN"), prioritization=p))
 
@@ -229,6 +246,72 @@ def test_explanation_is_auditable() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# new dimensions: threat-intel weights, KEV bypass, EPSS, asset criticality, routing
+# --------------------------------------------------------------------------- #
+def test_bypass_gate_reaches_highest_from_low_base() -> None:
+    # A modifier flagged `bypasses_highest_gate` (confirmed in-the-wild exploitation)
+    # waives Levers B+C: a sub-High QDS base may legitimately reach Highest.
+    kev = _mod("actively-attacked", "actively_attacked", "==", True, 2,
+               "actively-attacked", bypasses_highest_gate=True)
+    r = _engine([kev]).evaluate(_merged(qds=62, rtis=["Active_Attacks"]))  # Medium(2)+2 -> 4
+    assert r.priority is JiraPriority.HIGHEST
+    # The same +2 WITHOUT the bypass flag is gated back to High (Lever B).
+    gated = _engine([_mod("ransomware", "ransomware", "==", True, 2, "ransomware")])
+    assert gated.evaluate(_merged(qds=62, rtis=["Ransomware"])).priority is JiraPriority.HIGH
+
+
+def test_weighted_modifier_stacks_by_shift() -> None:
+    # A +2 weight moves two bands, not one: High base + ransomware -> Highest.
+    eng = _engine([_mod("ransomware", "ransomware", "==", True, 2)])
+    assert eng.evaluate(_merged(qds=75, rtis=["Ransomware"])).priority is JiraPriority.HIGHEST
+
+
+def test_epss_signal_drives_a_modifier() -> None:
+    eng = _engine([_mod("epss-high", "epss", ">=", 0.5, 1)])
+    assert eng.evaluate(_merged(qds=62, epss=0.7)).priority is JiraPriority.HIGH
+    assert eng.evaluate(_merged(qds=62, epss=0.2)).priority is JiraPriority.MEDIUM  # below thr
+
+
+def test_asset_criticality_modifiers() -> None:
+    eng = _engine([
+        _mod("high-crit", "asset_criticality", ">=", 4, 1),
+        _mod("low-crit", "asset_criticality", "<=", 1, -1),
+    ])
+    assert eng.evaluate(_merged(qds=62, asset_criticality=5)).priority is JiraPriority.HIGH
+    assert eng.evaluate(_merged(qds=62, asset_criticality=1)).priority is JiraPriority.LOW
+
+
+def test_routing_overrides_destination_without_touching_priority() -> None:
+    routing = [RoutingRule(
+        name="pci", when=Condition(signal="pci_flag", op="==", value=True),
+        project="PCI", component="Compliance", labels=["pci-scope"],
+    )]
+    eng = _engine(routing=routing)
+    r = eng.evaluate(_merged(qds=75, pci_flag=True))
+    assert r.project == "PCI" and r.component == "Compliance"
+    assert "pci-scope" in r.labels and "qjsync" in r.labels
+    assert r.priority is JiraPriority.HIGH  # routing never changes the band
+    base = eng.evaluate(_merged(qds=75))  # no match -> default destination
+    assert base.project == "QVULN" and base.component is None
+
+
+def test_signal_context_exposes_threat_intel_and_epss() -> None:
+    # The canonical signal_context surfaces each threat-category RTI and parsed EPSS so
+    # the modifiers can key off them; absent signals are False/None and never raise.
+    m = _merged(qds=80, rtis=["Active_Attacks", "Ransomware", "Wormable"], epss=0.83)
+    ctx = m.signal_context()
+    assert ctx["actively_attacked"] is True
+    assert ctx["ransomware"] is True
+    assert ctx["wormable"] is True
+    assert ctx["has_exploit"] is True  # Active_Attacks is also a generic exploit marker
+    assert ctx["epss"] == 0.83
+    clean = _merged(qds=80).signal_context()
+    assert clean["actively_attacked"] is False
+    assert clean["zero_day"] is False
+    assert clean["epss"] is None
+
+
+# --------------------------------------------------------------------------- #
 # end-to-end against the shipped examples/rules.yml — the motivating tickets
 # --------------------------------------------------------------------------- #
 def _example_engine() -> RulesEngine:
@@ -239,12 +322,28 @@ def _inet(qds: int, category: str, rti: str) -> MergedVulnerability:
     return _merged(qds=qds, category=category, rtis=[rti], asset_tags=_IFA)
 
 
-def test_no_low_qds_reaches_highest() -> None:
+def test_generic_exploit_on_low_qds_never_highest() -> None:
     eng = _example_engine()
-    # The exact tickets that motivated the change — none may be Highest.
-    assert eng.evaluate(_inet(35, "Windows", "Easy_Exploit")).priority is JiraPriority.MEDIUM
+    # Generic "exploit available" / "easy exploit" must NOT manufacture a Highest from a
+    # low QDS base — it may escalate, but Levers B+C hold it below Highest (the QDS-26 case).
     assert eng.evaluate(_inet(26, "Local", "Exploit_Public")).priority is JiraPriority.LOW
-    assert eng.evaluate(_inet(42, "Windows", "Active_Attacks")).priority is JiraPriority.MEDIUM
+    assert eng.evaluate(_inet(35, "Windows", "Easy_Exploit")).priority is not JiraPriority.HIGHEST
+
+
+def test_kev_grade_reaches_highest_from_low_base() -> None:
+    eng = _example_engine()
+    # Confirmed in-the-wild exploitation (actively-attacked, bypasses_highest_gate)
+    # legitimately reaches Highest even from a sub-High QDS base — unlike generic exploit.
+    assert eng.evaluate(_inet(42, "Windows", "Active_Attacks")).priority is JiraPriority.HIGHEST
+    assert eng.evaluate(_inet(62, "Windows", "Active_Attacks")).priority is JiraPriority.HIGHEST
+
+
+def test_compensating_control_downweights_via_substring_tag() -> None:
+    eng = _example_engine()
+    # A High-band detection on an EDR-covered host drops a band — exercising both the
+    # down-weight modifier and the list-substring `contains` against a long Qualys tag.
+    falcon = _merged(qds=88, category="Windows", asset_tags=["SW: CS Falcon Sensor Installed"])
+    assert eng.evaluate(falcon).priority is JiraPriority.MEDIUM
 
 
 def test_high_qds_still_reaches_top() -> None:

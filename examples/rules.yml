@@ -76,18 +76,84 @@ prioritization:
       - { signal: is_ignored, op: "==", value: 1 }
       - { signal: is_disabled, op: "==", value: 1 }
 
-  # Context modifiers — each shifts the QDS band by `shift`; they STACK; result is
-  # clamped to [skip, Highest]. PCI and the top RTI are surfaced as LABELS by the
-  # Jira mapper (visibility/triage), not as band modifiers.
+  # Context modifiers — each shifts the QDS band by `shift`; they STACK; the result
+  # is clamped to [skip, Highest]. Levers B/C keep "Highest" honest; only a modifier
+  # with `bypasses_highest_gate` (confirmed in-the-wild exploitation) may reach
+  # Highest from a sub-High QDS base. The top RTI and `pci` are surfaced as LABELS by
+  # the mapper (visibility), not as band modifiers. Tune weights to your risk appetite.
   modifiers:
-    - name: internet-facing       # reachability turns theoretical risk into real risk
+    # ── Threat intelligence (strongest real-world signals) ───────────────────────
+    - name: actively-attacked       # confirmed in-the-wild / KEV-grade -> "patch now"
+      when: { signal: actively_attacked, op: "==", value: true }
+      shift: 2
+      label: actively-attacked
+      bypasses_highest_gate: true   # legitimately reaches Highest regardless of QDS base
+    - name: ransomware
+      when: { signal: ransomware, op: "==", value: true }
+      shift: 2
+      label: ransomware
+    - name: wormable
+      when: { signal: wormable, op: "==", value: true }
+      shift: 1
+    - name: epss-high               # >=50% predicted exploitation within 30 days
+      when: { signal: epss, op: ">=", value: 0.5 }
+      shift: 1
+    - name: active-exploit          # generic "exploit available" (weaker than the above)
+      when: { signal: has_exploit, op: "==", value: true }
+      shift: 1
+
+    # ── Exposure / reachability (each caps at High on its own — Lever C) ──────────
+    - name: internet-facing
       when: { signal: asset_tags, op: contains, value: "Internet Facing Assets" }
       shift: 1
       label: internet-facing
-      caps_at_high: true          # Lever C: exposure alone tops out at High, never Highest
-    - name: active-exploit        # active/public exploit > Qualys's generic default
-      when: { signal: has_exploit, op: "==", value: true }
+      caps_at_high: true
+    - name: dmz
+      when: { signal: asset_tags, op: contains, value: "DMZ" }
       shift: 1
-    - name: local-category        # local-only reachability is lower risk
+      label: dmz
+      caps_at_high: true
+    - name: external-surface        # discovered on the external attack surface
+      when:
+        any:
+          - { signal: asset_tags, op: contains, value: "EASM" }
+          - { signal: asset_tags, op: contains, value: "Shodan" }
+      shift: 1
+      label: external-surface
+      caps_at_high: true
+
+    # ── Asset / business criticality ─────────────────────────────────────────────
+    - name: high-criticality-asset
+      when: { signal: asset_criticality, op: ">=", value: 4 }
+      shift: 1
+    - name: low-criticality-asset
+      when: { signal: asset_criticality, op: "<=", value: 1 }
+      shift: -1
+
+    # ── SLA / age ────────────────────────────────────────────────────────────────
+    - name: sla-overdue             # open beyond the remediation window
+      when: { signal: age_days, op: ">=", value: 30 }
+      shift: 1
+      label: sla-overdue
+
+    # ── Reachability down-weights / compensating controls ────────────────────────
+    - name: local-category          # local-only reachability is lower risk
       when: { signal: category, op: "==", value: "Local" }
       shift: -1
+    - name: compensating-control    # active EDR/proxy coverage reduces real exposure
+      when:
+        any:
+          - { signal: asset_tags, op: contains, value: "Falcon" }
+          - { signal: asset_tags, op: contains, value: "Zscaler" }
+      shift: -1
+
+  # Orthogonal context routing (first match wins): send detections to different Jira
+  # projects/teams/components by context, WITHOUT affecting priority. Labels add on.
+  routing:
+    - name: pci-scope               # tag PCI-in-scope findings for the compliance lane
+      when: { signal: pci_flag, op: "==", value: true }
+      labels: [pci-scope]
+    # - name: cloud-team            # example: route a business unit to its own project
+    #   when: { signal: asset_tags, op: contains, value: "Cloud" }
+    #   project: "CLOUDSEC"
+    #   component: "Cloud Platform"

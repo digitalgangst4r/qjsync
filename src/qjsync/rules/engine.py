@@ -84,6 +84,7 @@ class RulesEngine:
         #    used to decide whether Highest is reachable without exposure alone).
         shift = 0
         shift_uncapped = 0
+        bypass_gate = False
         fired: list[str] = []
         mod_labels: list[str] = []
         for mod in self.p.modifiers:
@@ -91,6 +92,8 @@ class RulesEngine:
                 shift += mod.shift
                 if not mod.caps_at_high:
                     shift_uncapped += mod.shift
+                if mod.bypasses_highest_gate:
+                    bypass_gate = True
                 fired.append(f"{mod.name}{mod.shift:+d}")
                 if mod.label:
                     mod_labels.append(mod.label)
@@ -99,9 +102,11 @@ class RulesEngine:
 
         # 3) Highest hygiene (Levers B + C). A result of Highest is only allowed if
         #    the QDS base is already High (B) AND it is reachable without relying on
-        #    a caps_at_high (exposure) modifier (C). Otherwise cap at High.
+        #    a caps_at_high (exposure) modifier (C). A firing modifier with
+        #    `bypasses_highest_gate` (e.g. confirmed in-the-wild exploitation) waives
+        #    both. Otherwise cap at High.
         capped = False
-        if level == _MAX_LEVEL:
+        if level == _MAX_LEVEL and not bypass_gate:
             b_ok = base >= _HIGH_LEVEL or not self.p.highest_requires_high_base
             c_ok = _clamp(base + shift_uncapped) == _MAX_LEVEL
             if not (b_ok and c_ok):
@@ -116,7 +121,19 @@ class RulesEngine:
         if level == _SKIP_LEVEL:
             return EvaluationResult(action=RuleAction.SKIP, matched_rule=explain)
 
-        # 4) Materialisation gate (Lever D-narrow): bands below materialize_min_band
+        # 4) Orthogonal context routing (first match wins): override the Jira
+        #    destination and add labels, without touching priority.
+        project, issue_type, component = jira.project, jira.issue_type, None
+        route_labels: list[str] = []
+        for route in self.p.routing:
+            if self._eval(route.when, ctx):
+                project = route.project or project
+                issue_type = route.issue_type or issue_type
+                component = route.component
+                route_labels = list(route.labels)
+                break
+
+        # 5) Materialisation gate (Lever D-narrow): bands below materialize_min_band
         #    are CLASSIFIED (priority set) but not created as Jira issues — action is
         #    SKIP so the orchestrator records state without ticketing until promoted.
         materialize_level = _BAND_TO_LEVEL[self.p.materialize_min_band]
@@ -125,9 +142,10 @@ class RulesEngine:
             action=action,
             matched_rule=explain,
             priority=_LEVEL_TO_PRIORITY[level],
-            project=jira.project,
-            issue_type=jira.issue_type,
-            labels=[jira.managed_label, *mod_labels],
+            project=project,
+            issue_type=issue_type,
+            component=component,
+            labels=[jira.managed_label, *mod_labels, *route_labels],
         )
 
     def _base_level(self, qds: Any) -> int:

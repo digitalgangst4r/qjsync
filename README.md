@@ -86,17 +86,27 @@ final_band = base_band(QDS) + Σ(±N context modifiers)      (clamped skip … H
 | ≥ 60 | Medium |
 | below | skip |
 
-**Modifiers** express *your* risk appetite and **stack**:
+**Modifiers** express *your* risk appetite across several dimensions and **stack**:
 
-| Modifier | shift | note |
+| Dimension | Signal → modifier | shift |
 |---|---|---|
-| internet-facing | **+1** | caps at High — exposure alone never reaches Highest |
-| active exploit (RTI) | **+1** | can reach Highest |
-| local-only category | **−1** | lower reachability, lower urgency |
+| **Threat intel** | actively-attacked / KEV-grade | **+2** *(bypasses the Highest gate)* |
+| | ransomware | **+2** |
+| | wormable · EPSS ≥ 0.5 · generic exploit available | **+1** each |
+| **Exposure** | internet-facing · DMZ · external attack surface | **+1** each *(caps at High)* |
+| **Asset** | high-criticality asset / low-criticality asset | **+1 / −1** |
+| **SLA** | open beyond the remediation window | **+1** |
+| **Reachability** | local-only category / compensating control (EDR/proxy) | **−1** each |
 
-Two guard-rails keep **Highest** meaningful: exposure alone caps at High, and Highest requires
+Three guard-rails keep **Highest** meaningful: exposure alone caps at High, and Highest requires
 a QDS base already ≥ 70 — so a QDS 26 with a public exploit lands **Low/Medium, not critical**.
+The one deliberate exception is **confirmed in-the-wild exploitation** (actively-attacked / KEV),
+which *bypasses* both gates to reach Highest from any base — "patch now" should never be capped.
 Only bands **≥ Medium** become Jira issues; **Low** is classified but not ticketed until promoted.
+
+**Context routing** (orthogonal to priority) sends findings to a different project, component, or
+label by context — e.g. PCI-in-scope detections get a `pci-scope` label, a business unit routes to
+its own Jira project — without ever changing the computed band.
 
 Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/FIELD_MAPPING.md`](docs/FIELD_MAPPING.md) · [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) · a commented [`examples/rules.yml`](examples/rules.yml).
 

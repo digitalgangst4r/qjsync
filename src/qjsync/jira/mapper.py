@@ -87,6 +87,8 @@ class IssueMapper:
         }
         if evaluation.priority is not None:
             fields["priority"] = {"name": evaluation.priority.value}
+        if evaluation.component:
+            fields["components"] = [{"name": evaluation.component}]
 
         # --- custom fields (discovered by name) -------------------------------
         # HOST

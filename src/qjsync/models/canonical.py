@@ -34,6 +34,22 @@ EXPLOIT_RTI_MARKERS = (
     "Predicted_High_Risk",
 )
 
+# Specific RTI categories (case-insensitive substring match) exposed as individual
+# prioritisation signals. Active in-the-wild exploitation (KEV-grade) and ransomware
+# are the strongest real-world signals and warrant their own weights/gates.
+_RTI_ACTIVELY_ATTACKED = ("Active_Attacks", "Actively_Attacked", "Known_Exploited", "Wild_Exploit")
+_RTI_RANSOMWARE = ("Ransomware",)
+_RTI_WORMABLE = ("Wormable",)
+_RTI_ZERO_DAY = ("Zero_Day",)
+_RTI_EASY_EXPLOIT = ("Easy_Exploit",)
+
+
+def _rtis_match(rtis: list[str], markers: tuple[str, ...]) -> bool:
+    """True if any RTI contains any of ``markers`` (case-insensitive)."""
+    joined = " ".join(rtis).lower()
+    return any(m.lower() in joined for m in markers)
+
+
 # RTIs ranked most -> least critical, used to surface the single most critical RTI
 # of a vulnerability as a Jira label. Names not listed rank below every listed one.
 RTI_CRITICALITY: tuple[str, ...] = (
@@ -302,6 +318,39 @@ class MergedVulnerability(BaseModel):
         joined = " ".join(self.all_rtis)
         return any(marker.lower() in joined.lower() for marker in EXPLOIT_RTI_MARKERS)
 
+    # Specific threat-intel signals (stronger/weaker than generic has_exploit).
+    @property
+    def actively_attacked(self) -> bool:
+        """Confirmed in-the-wild / known-exploited (KEV-grade) — the strongest signal."""
+        return _rtis_match(self.all_rtis, _RTI_ACTIVELY_ATTACKED)
+
+    @property
+    def ransomware(self) -> bool:
+        return _rtis_match(self.all_rtis, _RTI_RANSOMWARE)
+
+    @property
+    def wormable(self) -> bool:
+        return _rtis_match(self.all_rtis, _RTI_WORMABLE)
+
+    @property
+    def zero_day(self) -> bool:
+        return _rtis_match(self.all_rtis, _RTI_ZERO_DAY)
+
+    @property
+    def easy_exploit(self) -> bool:
+        return _rtis_match(self.all_rtis, _RTI_EASY_EXPLOIT)
+
+    @property
+    def epss(self) -> float | None:
+        """EPSS probability (0–1) from the detection's QDS_FACTORS, if Qualys provides it."""
+        raw = self.detection.qds_factors.get("EPSS")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
     @property
     def top_rti(self) -> str | None:
         """The single most critical RTI of this vulnerability (for a Jira label)."""
@@ -337,6 +386,12 @@ class MergedVulnerability(BaseModel):
             # threat intel
             "rtis": self.all_rtis,
             "has_exploit": self.has_exploit,
+            "actively_attacked": self.actively_attacked,
+            "ransomware": self.ransomware,
+            "wormable": self.wormable,
+            "zero_day": self.zero_day,
+            "easy_exploit": self.easy_exploit,
+            "epss": self.epss,
             "has_cve": self.has_cve,
             "cve_list": kb.cve_list if kb else [],
             # classification

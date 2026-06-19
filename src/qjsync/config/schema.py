@@ -112,12 +112,32 @@ class Modifier(BaseModel):
     # alone (internet-facing) is High at most; only a non-capped contributor
     # (active exploit) or a base already in the Highest band reaches Highest.
     caps_at_high: bool = False
+    # Escape hatch from the Highest hygiene gates (Levers B + C): a firing modifier
+    # with this set lets the result reach Highest even from a sub-High QDS base.
+    # Reserved for the strongest real-world signals (confirmed in-the-wild /
+    # KEV-grade exploitation), where "patch now" outranks the QDS base.
+    bypasses_highest_gate: bool = False
 
     @model_validator(mode="after")
     def _nonzero(self) -> Modifier:
         if self.shift == 0:
             raise ValueError(f"modifier '{self.name}' has shift 0 (no effect)")
         return self
+
+
+class RoutingRule(BaseModel):
+    """Orthogonal routing: the FIRST matching rule sets the Jira destination
+    (project / component / extra labels) for a detection, independent of priority.
+    Lets different business units / scopes (e.g. PCI) land in different projects."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    when: Condition
+    project: str | None = None
+    component: str | None = None
+    issue_type: str | None = None
+    labels: list[str] = Field(default_factory=list)
 
 
 class PrioritizationConfig(BaseModel):
@@ -137,6 +157,9 @@ class PrioritizationConfig(BaseModel):
     # but create no ticket until promoted. Default Medium (Low is classified, not
     # ticketed).
     materialize_min_band: Literal["Low", "Medium", "High", "Highest"] = "Medium"
+    # Orthogonal context routing (first match wins) — overrides the destination
+    # project/component/issue_type and adds labels, without affecting priority.
+    routing: list[RoutingRule] = Field(default_factory=list)
 
 
 class QualysQueryConfig(BaseModel):

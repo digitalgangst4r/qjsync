@@ -111,8 +111,13 @@ Each section degrades gracefully when its KB source is missing.
 
 - `summary` = `QID - <KB title>`
 - `priority.name` = the `EvaluationResult.priority` chosen by the rules engine
-- `project.key`, `issuetype.name` = routing from the matched rule or `JiraConfig`
-- `labels` = `managed_label` ("qjsync") + rule labels (+ `stale_label` on purge)
+- `project.key`, `issuetype.name` = `EvaluationResult.project`/`issue_type` — the
+  matched `routing` rule's override if any, else `JiraConfig`.
+- `components` = `[{name: EvaluationResult.component}]` when a `routing` rule sets a
+  component (omitted otherwise). Routing is orthogonal to priority: it changes *where*
+  a finding lands, never the computed band.
+- `labels` = `managed_label` ("qjsync") + firing modifiers' labels + matched
+  `routing` rule's labels (+ `stale_label` on purge)
   + **derived patch-routing label** (orthogonal to priority, set in the mapper when
   `jira.derive_patch_routing`): `patch_label` ("auto-patch") if KB `patchable` is
   true, else `mitigation_label` ("needs-mitigation") if false; nothing if unknown.

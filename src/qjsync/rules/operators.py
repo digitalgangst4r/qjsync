@@ -90,9 +90,18 @@ def _not_in(signal: Any, value: Any) -> bool:
 
 
 def _contains(signal: Any, value: Any) -> bool:
-    """``value`` is contained in ``signal`` (works for lists AND strings)."""
+    """``value`` is contained in ``signal`` (works for lists AND strings).
+
+    For a list (e.g. ``asset_tags``) this matches if ``value`` is an exact element
+    OR a substring of any element — so ``contains "Falcon"`` matches a Qualys tag
+    like ``"SW: CS Falcon Sensor Installed"`` and ``contains "DMZ"`` matches
+    ``"... - DMZ"``. For a string, it is a plain substring test.
+    """
     if signal is None:
         return False
+    if isinstance(signal, (list, tuple, set)):
+        needle = str(value)
+        return any(value == elem or needle in str(elem) for elem in signal)
     try:
         return value in signal
     except TypeError:

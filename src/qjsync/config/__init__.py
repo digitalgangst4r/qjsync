@@ -22,6 +22,7 @@ from qjsync.config.schema import (
     QdsBands,
     QjsyncConfig,
     QualysConfig,
+    RoutingRule,
 )
 from qjsync.config.settings import Secrets
 
@@ -36,5 +37,6 @@ __all__ = [
     "QdsBands",
     "QjsyncConfig",
     "QualysConfig",
+    "RoutingRule",
     "Secrets",
 ]
