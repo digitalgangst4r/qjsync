@@ -246,7 +246,7 @@ class JiraConfig(BaseModel):
     mitigation_label: str = "needs-mitigation"  # patchable == False (EOL/0-day/config)
     # Resolutions a human may set that the connector must never overwrite.
     sticky_resolutions: list[str] = Field(
-        default_factory=lambda: ["Won't Do", "Won't Fix", "Risk Accepted"]
+        default_factory=lambda: ["Won't Do", "Won't Fix", "Risk Accepted", "False Positive"]
     )
     requests_per_second: float = 8.0
 

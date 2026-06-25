@@ -195,7 +195,12 @@ class SyncOrchestrator:
         """
         mode = SyncMode(mode) if not isinstance(mode, SyncMode) else mode
         summary = RunSummary(mode=mode, dry_run=dry_run)
-        self._run_notes = {**(run_notes or {}), "sink": self.config.sink, "dry_run": dry_run}
+        self._run_notes = {
+            **(run_notes or {}), "sink": self.config.sink, "dry_run": dry_run,
+            # The dash sources its sticky-resolution dropdown from this, so a human's "False
+            # Positive" can never be one qjsync silently ignores (which would reopen the issue).
+            "sticky_resolutions": list(self.config.jira.sticky_resolutions),
+        }
 
         # Step 1 — start the run and compute the (incremental) window.
         with session_scope(self.session_factory) as session:

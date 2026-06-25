@@ -30,7 +30,10 @@ jira:
   # are listed in docs/JIRA_SETUP.md (and created by scripts/bootstrap_jira_fields.py).
   project: "${JIRA_PROJECT_KEY:-QVULN}"
   issue_type: "${JIRA_ISSUE_TYPE:-Bug}"
-  sticky_resolutions: ["Won't Do", "Won't Fix", "Risk Accepted"]
+  # Resolutions a human sets that qjsync RESPECTS (won't reopen/re-band). The qjsync-dash UI sources
+  # this exact list from the run, so the two can never silently diverge. Keep "False Positive" here
+  # if the dash offers it, or it gets clobbered on the next sync.
+  sticky_resolutions: ["Won't Do", "Won't Fix", "Risk Accepted", "False Positive"]
 
 qualys:
   module: vm
