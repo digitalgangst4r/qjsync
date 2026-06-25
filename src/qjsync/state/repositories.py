@@ -52,7 +52,7 @@ class SyncRunRepo:
         self.session.flush()  # assign run.id for use as last_seen_run this cycle
         return run
 
-    def finish(self, run: SyncRun, status: SyncRunStatus, **counts: int) -> SyncRun:
+    def finish(self, run: SyncRun, status: SyncRunStatus, **counts: object) -> SyncRun:
         """Close ``run`` with ``status`` and the per-run summary counters.
 
         ``counts`` keys mirror :class:`SyncRun`'s counter columns (``evaluated``,

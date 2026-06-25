@@ -181,15 +181,26 @@ class SyncOrchestrator:
     # ------------------------------------------------------------------ #
     # public entrypoint
     # ------------------------------------------------------------------ #
-    def run(self, dry_run: bool = False, *, mode: SyncMode | str = "incremental") -> RunSummary:
+    def run(
+        self, dry_run: bool = False, *, mode: SyncMode | str = "incremental",
+        run_notes: dict | None = None,
+    ) -> RunSummary:
         """Execute one sync cycle and return its :class:`RunSummary`.
 
         ``mode`` selects incremental (managed window, no purge) or full (whole
         scope, purge). ``dry_run`` performs all reads but no Jira writes and
-        reports *would-do* counts. Steps mirror docs/ARCHITECTURE.md.
+        reports *would-do* counts. Steps mirror docs/ARCHITECTURE.md. ``run_notes``
+        is stamped onto the run (e.g. rules origin/hash) for pipeline observability;
+        the active ``sink`` is always recorded.
         """
         mode = SyncMode(mode) if not isinstance(mode, SyncMode) else mode
         summary = RunSummary(mode=mode, dry_run=dry_run)
+        self._run_notes = {
+            **(run_notes or {}), "sink": self.config.sink, "dry_run": dry_run,
+            # The dash sources its sticky-resolution dropdown from this, so a human's "False
+            # Positive" can never be one qjsync silently ignores (which would reopen the issue).
+            "sticky_resolutions": list(self.config.jira.sticky_resolutions),
+        }
 
         # Step 1 — start the run and compute the (incremental) window.
         with session_scope(self.session_factory) as session:
@@ -622,7 +633,8 @@ class SyncOrchestrator:
             run = session.get(SyncRun, run_id)
             if run is None:  # pragma: no cover - run always exists here
                 return
-            SyncRunRepo(session).finish(run, status, **summary.finish_counts())
+            notes = getattr(self, "_run_notes", None) or None
+            SyncRunRepo(session).finish(run, status, **summary.finish_counts(), notes=notes)
 
 
 __all__ = [

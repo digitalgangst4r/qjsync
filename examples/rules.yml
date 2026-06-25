@@ -15,6 +15,13 @@
 
 version: 1
 
+# Where the sync lifecycle writes issue state:
+#   jira  -> Jira Cloud over HTTP (this file's `jira:` block; requires jira.project + JIRA_* creds)
+#   local -> the dash.issues work-layer in the same Postgres (no HTTP, no rate limit; qjsync-dash
+#            is the human surface). No Jira credentials required; the `jira:` block is optional.
+#   none  -> no-op sink (dashboard reads detection_state directly)
+sink: jira
+
 jira:
   # Project key + issue type. Set them literally, or pull from the environment with
   # ${VAR:-default} so the SAME ruleset targets different projects per environment:
@@ -23,7 +30,10 @@ jira:
   # are listed in docs/JIRA_SETUP.md (and created by scripts/bootstrap_jira_fields.py).
   project: "${JIRA_PROJECT_KEY:-QVULN}"
   issue_type: "${JIRA_ISSUE_TYPE:-Bug}"
-  sticky_resolutions: ["Won't Do", "Won't Fix", "Risk Accepted"]
+  # Resolutions a human sets that qjsync RESPECTS (won't reopen/re-band). The qjsync-dash UI sources
+  # this exact list from the run, so the two can never silently diverge. Keep "False Positive" here
+  # if the dash offers it, or it gets clobbered on the next sync.
+  sticky_resolutions: ["Won't Do", "Won't Fix", "Risk Accepted", "False Positive"]
 
 qualys:
   module: vm

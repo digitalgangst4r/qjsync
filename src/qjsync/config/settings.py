@@ -24,10 +24,10 @@ class Secrets(BaseSettings):
     # Platform API root, e.g. https://qualysapi.qg2.apps.qualys.com (NO trailing /api).
     qualys_api_url: str = Field(..., alias="QUALYS_API_URL")
 
-    # --- Jira ---
-    jira_base_url: str = Field(..., alias="JIRA_BASE_URL")
-    jira_email: str = Field(..., alias="JIRA_EMAIL")
-    jira_api_token: str = Field(..., alias="JIRA_API_TOKEN")
+    # --- Jira (optional: not required when jira.enabled is false in rules.yml) ---
+    jira_base_url: str | None = Field(None, alias="JIRA_BASE_URL")
+    jira_email: str | None = Field(None, alias="JIRA_EMAIL")
+    jira_api_token: str | None = Field(None, alias="JIRA_API_TOKEN")
 
     # --- State store ---
     database_url: str = Field(

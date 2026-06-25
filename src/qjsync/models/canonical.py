@@ -410,6 +410,8 @@ class MergedVulnerability(BaseModel):
             "age_days": self.age_days,
             # asset facts
             "os": self.asset.os,
+            "ip": self.asset.ip,
+            "dns": self.asset.dns,
             "tracking_method": self.asset.tracking_method,
             "asset_tags": self.asset.asset_tags,
             "network_id": self.asset.network_id,
