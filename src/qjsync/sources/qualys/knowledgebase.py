@@ -1,7 +1,8 @@
 """KnowledgeBase reader.
 
 :func:`fetch_kb` streams :class:`KbVuln` enrichment rows out of
-``/api/2.0/fo/knowledge_base/vuln/`` with ``action=list&details=All``. When a set
+``/api/4.0/fo/knowledge_base/vuln/`` with ``action=list&details=All`` (the 2.0 path is at
+End-of-Service on current PODs; 4.0 is the drop-in successor). When a set
 of QIDs is given it requests just those (``ids=<comma list>``); otherwise it pulls
 the whole KnowledgeBase. Either way it follows the same ``<WARNING><URL>``
 truncation pointer the HLD endpoint uses (``id_min``), so a full refresh never
@@ -27,7 +28,11 @@ from qjsync.models.canonical import KbVuln
 from qjsync.sources.qualys import parse
 from qjsync.sources.qualys.client import QualysClient
 
-_KB_ENDPOINT = "/api/2.0/fo/knowledge_base/vuln/"
+# Qualys 4.0 KnowledgeBase path. The legacy 2.0 path (.../api/2.0/fo/knowledge_base/vuln/) is at
+# End-of-Service on current PODs (returns an EOS warning, and rejects heavy full pulls); the 4.0
+# path is a drop-in replacement — identical request params and identical XML response schema
+# (KNOWLEDGE_BASE_VULN_LIST_OUTPUT/RESPONSE/VULN_LIST/VULN), so the parser below is unchanged.
+_KB_ENDPOINT = "/api/4.0/fo/knowledge_base/vuln/"
 _TRUNCATION_CODE = "1980"
 
 
