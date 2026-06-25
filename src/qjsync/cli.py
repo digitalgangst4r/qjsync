@@ -174,6 +174,8 @@ def _build_orchestrator(
         from qjsync.jira.client import JiraClient
         from qjsync.jira.mapper import IssueMapper
 
+        # _check_jira_secrets (called before _build_orchestrator) guarantees these are set.
+        assert secrets.jira_base_url and secrets.jira_email and secrets.jira_api_token
         auth = BasicAuthProvider(secrets.jira_email, secrets.jira_api_token)
         sink: Any = JiraClient(
             secrets.jira_base_url,

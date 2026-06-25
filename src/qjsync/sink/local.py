@@ -134,8 +134,8 @@ class LocalSink:
                 return {"key": existing.local_key}
             values = {k: fields[k] for k in SINK_INSERT_COLUMNS if k in fields}
             values.update(lifecycle_state="open", created_at=now, updated_at=now)
-            result = s.execute(insert(issues).values(**values))
-            issue_id = int(result.inserted_primary_key[0])
+            result = s.execute(insert(issues).values(**values).returning(issues.c.id))
+            issue_id = int(result.scalar_one())
             key = f"QJ-{issue_id}"
             s.execute(update(issues).where(issues.c.id == issue_id).values(local_key=key))
             s.execute(
