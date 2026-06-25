@@ -59,6 +59,8 @@ issues = Table(
     Column("epss", Numeric),
     Column("cve_list", _JSON),
     Column("host_id", BigInteger),
+    Column("ip", String(45)),   # the affected machine (so a team can act without leaving the dash)
+    Column("dns", String(255)),
     Column("os", String),
     Column("tracking_method", String(32)),
     Column("network_id", Integer),
@@ -103,15 +105,15 @@ issue_events = Table(
 # Columns the sink may set on INSERT (workflow_status/assignee/etc. take their DB defaults).
 SINK_INSERT_COLUMNS: tuple[str, ...] = (
     "primary_key", "qid", "title", "qds", "severity", "cvss_v3_base", "epss", "cve_list",
-    "host_id", "os", "tracking_method", "network_id", "pci_flag", "has_exploit",
+    "host_id", "ip", "dns", "os", "tracking_method", "network_id", "pci_flag", "has_exploit",
     "actively_attacked", "ransomware", "wormable", "qualys_status", "asset_tags",
     "priority", "band", "labels", "lifecycle_state", "first_found_at",
 )
 
 # Columns the sink may set on UPDATE — the qjsync-owned set ONLY (never workflow/assignee/sticky).
 SINK_UPDATE_COLUMNS: tuple[str, ...] = (
-    "qid", "title", "qds", "severity", "cvss_v3_base", "epss", "cve_list", "host_id", "os",
-    "tracking_method", "network_id", "pci_flag", "has_exploit", "actively_attacked", "ransomware",
-    "wormable", "qualys_status", "asset_tags", "priority", "band", "labels", "lifecycle_state",
-    "first_found_at", "closed_at", "purged_at",
+    "qid", "title", "qds", "severity", "cvss_v3_base", "epss", "cve_list", "host_id", "ip", "dns",
+    "os", "tracking_method", "network_id", "pci_flag", "has_exploit", "actively_attacked",
+    "ransomware", "wormable", "qualys_status", "asset_tags", "priority", "band", "labels",
+    "lifecycle_state", "first_found_at", "closed_at", "purged_at",
 )

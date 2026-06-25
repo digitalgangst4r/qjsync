@@ -76,6 +76,8 @@ class LocalFieldBuilder:
             "cve_list": s.get("cve_list") or [],
             "host_id": merged.asset.host_id,
             "os": s.get("os"),
+            "ip": s.get("ip"),
+            "dns": s.get("dns"),
             "tracking_method": s.get("tracking_method"),
             "network_id": s.get("network_id"),
             "pci_flag": s.get("pci_flag"),
