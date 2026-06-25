@@ -6,7 +6,7 @@ LocalSink only changes *where* state is written and read:
 
 * create/update mirror the qjsync-owned columns only (never the team's workflow/assignee/sticky).
 * transition maps fixed/stale/reopen onto ``lifecycle_state`` (+ closed/purged stamps), separate
-  from the team workflow (the dash auto-moves workflow to "Concluído" on closed_fixed via a trigger).
+  from the team workflow (the dash auto-moves workflow to Concluído on closed_fixed via a trigger).
 * get_issue returns the team-set ``sticky_resolution`` so the orchestrator's sticky/no-surprise
   logic keeps working — now the human sets it in the dash, not in Jira.
 * create is idempotent on ``primary_key`` (re-create reconciles to the existing issue).
@@ -93,7 +93,7 @@ class LocalFieldBuilder:
 
 
 class LocalSink:
-    """Implements :class:`~qjsync.sink.base.IssueSink` over ``dash.issues``/``dash.issue_events``."""
+    """Implements :class:`~qjsync.sink.base.IssueSink` over the ``dash.issues`` work-layer."""
 
     def __init__(self, session_factory: sessionmaker[Session], config: QjsyncConfig) -> None:
         self._sf = session_factory

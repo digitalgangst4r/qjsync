@@ -12,7 +12,7 @@ Ownership (enforced in Postgres by grants — see the dash migration):
 
 * qjsync (LocalSink) writes:  mirrored vuln fields, ``priority``/``band``/``labels``,
   ``lifecycle_state``, the lifecycle timestamps, ``first_found_at``. Reads ``sticky_resolution``.
-* dash (team UI) writes:      ``workflow_status``, ``assignee_id``, ``sticky_resolution`` (+ reason),
+* dash (team UI) writes: ``workflow_status``, ``assignee_id``, ``sticky_resolution`` (+ reason),
   ``due_date``, human comments/events.
 """
 
@@ -68,7 +68,7 @@ issues = Table(
     Column("ransomware", Boolean),
     Column("wormable", Boolean),
     Column("qualys_status", String(32)),
-    Column("asset_tags", _JSON),  # the Qualys asset tags — the dash scopes visibility by team off these
+    Column("asset_tags", _JSON),  # Qualys asset tags — the dash scopes team visibility off these
     # --- qjsync-owned: derived prioritisation (NOT in detection_state; must be mirrored) ---
     Column("priority", String(32)),
     Column("band", String(32)),
@@ -94,7 +94,7 @@ issue_events = Table(
     Column("id", BigInteger, primary_key=True, autoincrement=True),
     Column("issue_id", BigInteger),  # FK -> dash.issues.id
     Column("author", String(128)),  # "qjsync" / "system" for sink events
-    Column("kind", String(32)),  # opened | updated | closed_fixed | closed_stale | reopened | comment
+    Column("kind", String(32)),  # opened|updated|closed_fixed|closed_stale|reopened|comment
     Column("body", Text),
     Column("payload", _JSON),
     Column("created_at", DateTime(timezone=True)),
@@ -104,8 +104,8 @@ issue_events = Table(
 SINK_INSERT_COLUMNS: tuple[str, ...] = (
     "primary_key", "qid", "title", "qds", "severity", "cvss_v3_base", "epss", "cve_list",
     "host_id", "os", "tracking_method", "network_id", "pci_flag", "has_exploit",
-    "actively_attacked", "ransomware", "wormable", "qualys_status", "asset_tags", "priority", "band", "labels",
-    "lifecycle_state", "first_found_at",
+    "actively_attacked", "ransomware", "wormable", "qualys_status", "asset_tags",
+    "priority", "band", "labels", "lifecycle_state", "first_found_at",
 )
 
 # Columns the sink may set on UPDATE — the qjsync-owned set ONLY (never workflow/assignee/sticky).

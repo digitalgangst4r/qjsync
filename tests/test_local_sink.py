@@ -31,8 +31,8 @@ from qjsync.models.canonical import (
     KbVuln,
     MergedVulnerability,
 )
-from qjsync.sink.contract import issue_events, issues
 from qjsync.sink.contract import _metadata as dash_meta
+from qjsync.sink.contract import issue_events, issues
 from qjsync.sink.local import LocalFieldBuilder, LocalSink
 from qjsync.state.db import create_all
 from qjsync.state.models import SyncMode
@@ -67,7 +67,10 @@ def _merged(
     tracking: str = "AGENT",
 ) -> MergedVulnerability:
     return MergedVulnerability(
-        asset=Asset(host_id=host_id, tracking_method=tracking, last_vm_scanned_date="2026-06-19T00:00:00Z"),
+        asset=Asset(
+            host_id=host_id, tracking_method=tracking,
+            last_vm_scanned_date="2026-06-19T00:00:00Z",
+        ),
         detection=Detection(
             qid=qid, port=443, qds=qds, status=status, first_found_datetime="2026-01-01T00:00:00Z"
         ),
@@ -102,7 +105,9 @@ def factory() -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False, future=True, class_=Session)
 
 
-def _orch(source: FakeSource, factory: sessionmaker[Session], cfg: QjsyncConfig) -> SyncOrchestrator:
+def _orch(
+    source: FakeSource, factory: sessionmaker[Session], cfg: QjsyncConfig
+) -> SyncOrchestrator:
     from qjsync.rules.engine import RulesEngine
 
     return SyncOrchestrator(
@@ -145,7 +150,8 @@ def test_local_create_writes_issue(factory: sessionmaker[Session]) -> None:
     # detection_state (qjsync) links to the local key
     assert _state(factory, m.primary_key()).jira_issue_key == iss["local_key"]
     # timeline has an 'opened' event authored by qjsync
-    assert any(e["kind"] == "opened" and e["author"] == "qjsync" for e in _events(factory, iss["id"]))
+    events = _events(factory, iss["id"])
+    assert any(e["kind"] == "opened" and e["author"] == "qjsync" for e in events)
 
 
 def test_local_fixed_closes_lifecycle(factory: sessionmaker[Session]) -> None:
