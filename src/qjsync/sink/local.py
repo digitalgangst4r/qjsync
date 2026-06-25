@@ -84,6 +84,7 @@ class LocalFieldBuilder:
             "ransomware": s.get("ransomware"),
             "wormable": s.get("wormable"),
             "qualys_status": s.get("status"),
+            "asset_tags": s.get("asset_tags") or [],
             "priority": priority,
             "band": priority,  # the band-shift prioritisation output (qjsync has no separate band)
             "labels": list(evaluation.labels),

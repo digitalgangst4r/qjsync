@@ -68,6 +68,7 @@ issues = Table(
     Column("ransomware", Boolean),
     Column("wormable", Boolean),
     Column("qualys_status", String(32)),
+    Column("asset_tags", _JSON),  # the Qualys asset tags — the dash scopes visibility by team off these
     # --- qjsync-owned: derived prioritisation (NOT in detection_state; must be mirrored) ---
     Column("priority", String(32)),
     Column("band", String(32)),
@@ -103,7 +104,7 @@ issue_events = Table(
 SINK_INSERT_COLUMNS: tuple[str, ...] = (
     "primary_key", "qid", "title", "qds", "severity", "cvss_v3_base", "epss", "cve_list",
     "host_id", "os", "tracking_method", "network_id", "pci_flag", "has_exploit",
-    "actively_attacked", "ransomware", "wormable", "qualys_status", "priority", "band", "labels",
+    "actively_attacked", "ransomware", "wormable", "qualys_status", "asset_tags", "priority", "band", "labels",
     "lifecycle_state", "first_found_at",
 )
 
@@ -111,6 +112,6 @@ SINK_INSERT_COLUMNS: tuple[str, ...] = (
 SINK_UPDATE_COLUMNS: tuple[str, ...] = (
     "qid", "title", "qds", "severity", "cvss_v3_base", "epss", "cve_list", "host_id", "os",
     "tracking_method", "network_id", "pci_flag", "has_exploit", "actively_attacked", "ransomware",
-    "wormable", "qualys_status", "priority", "band", "labels", "lifecycle_state", "first_found_at",
-    "closed_at", "purged_at",
+    "wormable", "qualys_status", "asset_tags", "priority", "band", "labels", "lifecycle_state",
+    "first_found_at", "closed_at", "purged_at",
 )
