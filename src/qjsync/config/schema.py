@@ -226,10 +226,7 @@ class QualysConfig(BaseModel):
 class JiraConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # When false, qjsync runs in dashboard-only mode: the full detection lifecycle
-    # (open/fixed/stale) is written to the state store, but NO Jira call is ever made
-    # and Jira credentials are not required. The qjsync-dash service reads that state.
-    enabled: bool = True
+    # `project` is required only when the active sink is `jira` (validated on QjsyncConfig).
     project: str = ""
     issue_type: str = "Host Vulnerability"
     primary_key_field: str = "Primary Key"
@@ -252,13 +249,6 @@ class JiraConfig(BaseModel):
         default_factory=lambda: ["Won't Do", "Won't Fix", "Risk Accepted"]
     )
     requests_per_second: float = 8.0
-
-    @model_validator(mode="after")
-    def _require_project_when_enabled(self) -> JiraConfig:
-        """``project`` is mandatory only when Jira is enabled (it scopes issue creation)."""
-        if self.enabled and not self.project:
-            raise ValueError("jira.project is required when jira.enabled is true")
-        return self
 
 
 class DriftConfig(BaseModel):
@@ -313,10 +303,22 @@ class QjsyncConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: int = 1
+    # Where the sync lifecycle writes issue state:
+    #   jira  -> Jira Cloud over HTTP (requires jira.project + JIRA_* secrets)
+    #   local -> the dash.issues work-layer in the same Postgres (no HTTP, no rate limit)
+    #   none  -> no-op sink (dashboard-only via a plain read of detection_state)
+    sink: Literal["jira", "local", "none"] = "jira"
     qualys: QualysConfig = Field(default_factory=QualysConfig)
-    jira: JiraConfig
+    jira: JiraConfig = Field(default_factory=JiraConfig)
     prioritization: PrioritizationConfig = Field(default_factory=PrioritizationConfig)
     drift: DriftConfig = Field(default_factory=DriftConfig)
     purge: PurgeConfig = Field(default_factory=PurgeConfig)
     primary_key: PrimaryKeyConfig = Field(default_factory=PrimaryKeyConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+    @model_validator(mode="after")
+    def _require_jira_project_for_jira_sink(self) -> QjsyncConfig:
+        """``jira.project`` is mandatory only when the active sink is ``jira``."""
+        if self.sink == "jira" and not self.jira.project:
+            raise ValueError("jira.project is required when sink is 'jira'")
+        return self

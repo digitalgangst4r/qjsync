@@ -556,7 +556,7 @@ def test_run_marked_failed_on_source_error(
 # --------------------------------------------------------------------------- #
 def _no_jira_config(*, agent_grace_syncs: int = 1) -> QjsyncConfig:
     return QjsyncConfig(
-        jira=JiraConfig(enabled=False),  # no project required when disabled
+        sink="none",  # no-op sink; no project required
         qualys=QualysConfig(),
         purge=PurgeConfig(agent_grace_syncs=agent_grace_syncs, network_scan_grace_days=30),
         primary_key=PrimaryKeyConfig(),
@@ -622,14 +622,15 @@ def test_dashboard_only_stale_purge_in_state(session_factory: sessionmaker[Sessi
     assert row.purged_at is not None  # the durable "this was NOT a fix" marker
 
 
-def test_jira_disabled_config_allows_missing_project() -> None:
-    cfg = QjsyncConfig(jira=JiraConfig(enabled=False))
-    assert cfg.jira.enabled is False
-    assert cfg.jira.project == ""
+def test_nonjira_sink_allows_missing_project() -> None:
+    for sink in ("local", "none"):
+        cfg = QjsyncConfig(sink=sink)
+        assert cfg.sink == sink
+        assert cfg.jira.project == ""  # not required when the sink isn't jira
 
 
-def test_jira_enabled_requires_project() -> None:
+def test_jira_sink_requires_project() -> None:
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError):
-        JiraConfig(enabled=True, project="")
+        QjsyncConfig(sink="jira", jira=JiraConfig(project=""))

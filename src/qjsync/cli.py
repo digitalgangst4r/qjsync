@@ -87,12 +87,12 @@ def _load_secrets() -> Secrets:
 
 
 def _check_jira_secrets(config: QjsyncConfig, secrets: Secrets) -> None:
-    """When Jira is enabled, require its credentials up front with a clear message.
+    """When the active sink is ``jira``, require its credentials up front with a clear message.
 
-    In dashboard-only mode (``jira.enabled: false``) this is a no-op, so a deployment that
-    never touches Jira does not need JIRA_* set at all.
+    For ``sink: local`` / ``sink: none`` this is a no-op, so a deployment that never touches Jira
+    does not need JIRA_* set at all.
     """
-    if not config.jira.enabled:
+    if config.sink != "jira":
         return
     missing = [
         name
@@ -105,9 +105,8 @@ def _check_jira_secrets(config: QjsyncConfig, secrets: Secrets) -> None:
     ]
     if missing:
         typer.secho(
-            "Jira is enabled but these credentials are missing: "
-            f"{', '.join(missing)}. Set them, or run dashboard-only with "
-            "`jira.enabled: false` in rules.yml.",
+            "sink is 'jira' but these credentials are missing: "
+            f"{', '.join(missing)}. Set them, or use `sink: local` / `sink: none` in rules.yml.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -140,15 +139,15 @@ def _build_orchestrator(
     secrets: Secrets,
     config: QjsyncConfig,
 ) -> SyncOrchestrator:
-    """Wire Qualys -> source -> rules -> (Jira | null sink) -> orchestrator.
+    """Wire Qualys -> source -> rules -> sink -> orchestrator.
 
     Isolated in one place so the whole heavy chain can be replaced with a stub in
     tests by monkeypatching ``qjsync.cli._build_orchestrator``; no network or DB
     connection is opened until a command actually calls ``.run()``.
 
-    When ``config.jira.enabled`` is false (dashboard-only mode) the Jira client and
-    field mapper are swapped for no-ops: the orchestrator runs its full lifecycle into
-    the state store, but no Jira REST call is made and no Jira credentials are needed.
+    The sink is chosen by ``config.sink``: ``jira`` (Jira Cloud over HTTP), ``local`` (the
+    dash.issues work-layer in the same Postgres — no HTTP/rate limit), or ``none`` (no-op).
+    The orchestrator runs the identical lifecycle in every case.
     """
     from qjsync.rules.engine import RulesEngine
     from qjsync.sources.qualys.client import QualysClient
@@ -170,13 +169,13 @@ def _build_orchestrator(
     source = VmSource(qualys_client, session_factory, config)
     rules_engine = RulesEngine(config)
 
-    if config.jira.enabled:
+    if config.sink == "jira":
         from qjsync.jira.auth import BasicAuthProvider
         from qjsync.jira.client import JiraClient
         from qjsync.jira.mapper import IssueMapper
 
         auth = BasicAuthProvider(secrets.jira_email, secrets.jira_api_token)
-        jira_client = JiraClient(
+        sink: Any = JiraClient(
             secrets.jira_base_url,
             auth,
             requests_per_second=config.jira.requests_per_second,
@@ -184,17 +183,23 @@ def _build_orchestrator(
         # Discover custom-field ids by name (live GET /rest/api/3/field) and wire the
         # real IssueMapper so issues carry the full FIELD_MAPPING field set rather than
         # the orchestrator's minimal fallback builder.
-        field_ids = jira_client.discover_fields()
+        field_ids = sink.discover_fields()
         mapper: Any = IssueMapper(field_ids, config)
-    else:
-        # Dashboard-only mode: never call Jira, never require Jira credentials.
+    elif config.sink == "local":
+        # Work-layer: write the lifecycle into dash.issues (same Postgres) — no HTTP, no rate limit.
+        from qjsync.sink.local import LocalFieldBuilder, LocalSink
+
+        sink = LocalSink(session_factory, config)
+        mapper = LocalFieldBuilder()
+    else:  # "none"
+        # No-op sink: never call Jira, never require Jira credentials.
         from qjsync.jira.null import NullFieldBuilder, NullJiraClient
 
-        jira_client = NullJiraClient()
+        sink = NullJiraClient()
         mapper = NullFieldBuilder()
 
     return SyncOrchestrator(
-        source, rules_engine, jira_client, session_factory, config, mapper=mapper
+        source, rules_engine, sink, session_factory, config, mapper=mapper
     )
 
 

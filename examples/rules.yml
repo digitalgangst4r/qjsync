@@ -15,11 +15,14 @@
 
 version: 1
 
+# Where the sync lifecycle writes issue state:
+#   jira  -> Jira Cloud over HTTP (this file's `jira:` block; requires jira.project + JIRA_* creds)
+#   local -> the dash.issues work-layer in the same Postgres (no HTTP, no rate limit; qjsync-dash
+#            is the human surface). No Jira credentials required; the `jira:` block is optional.
+#   none  -> no-op sink (dashboard reads detection_state directly)
+sink: jira
+
 jira:
-  # Dashboard-only mode: set `enabled: false` to make qjsync write the full detection lifecycle
-  # (open/fixed/stale) to the state store WITHOUT ever calling Jira. No Jira credentials are then
-  # required, `project` is optional, and qjsync-dash reads the state directly. Default: true.
-  enabled: true
   # Project key + issue type. Set them literally, or pull from the environment with
   # ${VAR:-default} so the SAME ruleset targets different projects per environment:
   #   export JIRA_PROJECT_KEY=PRODSEC   ->  project resolves to PRODSEC
