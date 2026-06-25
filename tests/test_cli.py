@@ -130,8 +130,12 @@ class _FakeOrchestrator:
         self.source = _FakeSource()
         self.run_calls: list[tuple[bool, SyncMode]] = []
 
-    def run(self, dry_run: bool = False, *, mode: SyncMode = SyncMode.INCREMENTAL) -> RunSummary:
+    def run(
+        self, dry_run: bool = False, *, mode: SyncMode = SyncMode.INCREMENTAL,
+        run_notes: dict | None = None,
+    ) -> RunSummary:
         self.run_calls.append((dry_run, mode))
+        self.last_run_notes = run_notes
         return RunSummary(mode=mode, dry_run=dry_run, evaluated=3, created=1, skipped=2)
 
 

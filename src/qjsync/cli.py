@@ -277,6 +277,18 @@ def dry_run(
     _run_sync(config_path, mode, dry_run=True)
 
 
+def _rules_notes(config_path: Path) -> dict:
+    """Origin + short hash of the active rules file, stamped on the sync_run for the dash's
+    pipeline-health page (so an operator can confirm WHICH ruleset produced a run)."""
+    import hashlib
+
+    try:
+        digest = hashlib.sha256(config_path.read_bytes()).hexdigest()[:16]
+        return {"rules_path": str(config_path), "rules_sha256": digest}
+    except OSError:
+        return {"rules_path": str(config_path)}
+
+
 def _run_sync(config_path: Path, mode: SyncMode, *, dry_run: bool) -> None:
     """Shared body for ``sync`` and ``dry-run``."""
     config = _load_config(config_path)
@@ -284,7 +296,7 @@ def _run_sync(config_path: Path, mode: SyncMode, *, dry_run: bool) -> None:
     secrets = _load_secrets()
     _check_jira_secrets(config, secrets)
     orchestrator = _build_orchestrator(secrets, config)
-    summary = orchestrator.run(dry_run, mode=mode)
+    summary = orchestrator.run(dry_run, mode=mode, run_notes=_rules_notes(config_path))
     _print_summary(summary)
 
 
