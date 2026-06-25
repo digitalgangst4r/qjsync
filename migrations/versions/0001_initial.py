@@ -24,10 +24,15 @@ depends_on = None
 
 
 # Enum types, named to match the SAEnum(..., name=...) in state/models.py.
-sync_run_status = sa.Enum("running", "success", "failed", name="sync_run_status")
-sync_mode = sa.Enum("incremental", "full", name="sync_mode")
-closure_reason = sa.Enum("fixed", "stale", name="closure_reason")
-job_status = sa.Enum("pending", "in_progress", "done", "failed", name="job_status")
+# The labels are the Python enum MEMBER NAMES, which is what SQLAlchemy's default (no
+# values_callable) Enum persists and what `init-db`/create_all builds from the ORM models.
+# Keeping them in lock-step is what lets `alembic upgrade head` produce a schema the ORM can
+# actually write to — an earlier lowercase-value version rejected the ORM's name-based inserts
+# (e.g. invalid input value for enum sync_run_status: "RUNNING").
+sync_run_status = sa.Enum("RUNNING", "SUCCESS", "FAILED", name="sync_run_status")
+sync_mode = sa.Enum("INCREMENTAL", "FULL", name="sync_mode")
+closure_reason = sa.Enum("FIXED", "STALE", name="closure_reason")
+job_status = sa.Enum("PENDING", "IN_PROGRESS", "DONE", "FAILED", name="job_status")
 
 
 def upgrade() -> None:
