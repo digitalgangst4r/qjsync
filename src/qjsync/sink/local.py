@@ -146,8 +146,9 @@ class LocalSink:
         return {"key": key}
 
     def update_issue(self, issue_key: str, fields: dict[str, Any]) -> None:
+        now = _now()
         values = {k: fields[k] for k in SINK_UPDATE_COLUMNS if k in fields}
-        values["updated_at"] = _now()
+        values["updated_at"] = now
         with session_scope(self._sf) as s:
             cur = s.execute(
                 select(issues.c.id, issues.c.band).where(issues.c.local_key == issue_key)
@@ -156,14 +157,13 @@ class LocalSink:
                 return
             s.execute(update(issues).where(issues.c.local_key == issue_key).values(**values))
             new_band = values.get("band")
-            if new_band is not None and new_band != cur.band:
+            # Only a genuine *re*-prioritisation (band actually changed from a known prior value)
+            # is timeline-worthy — not the first time a band is set.
+            if new_band is not None and cur.band is not None and new_band != cur.band:
                 s.execute(
                     insert(issue_events).values(
-                        issue_id=cur.id,
-                        author="qjsync",
-                        kind="reprioritised",
-                        body=f"{cur.band or '—'} → {new_band}",
-                        created_at=_now(),
+                        issue_id=cur.id, author="qjsync", kind="reprioritised",
+                        body=f"{cur.band} → {new_band}", created_at=now,
                     )
                 )
 
