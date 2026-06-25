@@ -549,3 +549,87 @@ def test_run_marked_failed_on_source_error(
         run = s.scalars(select(SyncRun)).first()
         assert run is not None
         assert run.status is SyncRunStatus.FAILED
+
+
+# --------------------------------------------------------------------------- #
+# dashboard-only mode (jira.enabled = false): full lifecycle, zero Jira calls
+# --------------------------------------------------------------------------- #
+def _no_jira_config(*, agent_grace_syncs: int = 1) -> QjsyncConfig:
+    return QjsyncConfig(
+        jira=JiraConfig(enabled=False),  # no project required when disabled
+        qualys=QualysConfig(),
+        purge=PurgeConfig(agent_grace_syncs=agent_grace_syncs, network_scan_grace_days=30),
+        primary_key=PrimaryKeyConfig(),
+        prioritization=PrioritizationConfig(),
+    )
+
+
+def _null_orch(
+    source: FakeSource, factory: sessionmaker[Session], config: QjsyncConfig
+) -> SyncOrchestrator:
+    from qjsync.jira.null import NullFieldBuilder, NullJiraClient
+    from qjsync.rules.engine import RulesEngine
+
+    return SyncOrchestrator(
+        source, RulesEngine(config), NullJiraClient(), factory, config, mapper=NullFieldBuilder()
+    )
+
+
+def test_dashboard_only_create_uses_local_marker(session_factory: sessionmaker[Session]) -> None:
+    from qjsync.jira.null import local_issue_key
+
+    cfg = _no_jira_config()
+    merged = _merged(qds=90, status=DetectionStatus.ACTIVE)
+    summary = _null_orch(FakeSource([merged]), session_factory, cfg).run(mode=SyncMode.FULL)
+
+    assert summary.created == 1
+    row = _state(session_factory, merged.primary_key())
+    assert row is not None
+    assert row.closed_at is None  # open
+    # The "issue key" is a deterministic local marker — never a real Jira key.
+    assert row.jira_issue_key == local_issue_key(merged.primary_key())
+    assert row.jira_issue_key.startswith("LOCAL-")
+
+
+def test_dashboard_only_fixed_closes_in_state(session_factory: sessionmaker[Session]) -> None:
+    cfg = _no_jira_config()
+    merged = _merged(qds=90, status=DetectionStatus.ACTIVE)
+    _null_orch(FakeSource([merged]), session_factory, cfg).run(mode=SyncMode.FULL)
+
+    summary = _null_orch(
+        FakeSource([_merged(qds=90, status=DetectionStatus.FIXED)]), session_factory, cfg
+    ).run(mode=SyncMode.FULL)
+
+    assert summary.closed_fixed == 1
+    row = _state(session_factory, merged.primary_key())
+    assert row is not None
+    assert row.closed_at is not None
+    assert row.closed_reason is ClosureReason.FIXED
+
+
+def test_dashboard_only_stale_purge_in_state(session_factory: sessionmaker[Session]) -> None:
+    # agent_grace_syncs=1: present once, then absent on a full run -> stale (purge).
+    cfg = _no_jira_config(agent_grace_syncs=1)
+    merged = _merged(qds=90, status=DetectionStatus.ACTIVE, tracking_method="AGENT")
+    _null_orch(FakeSource([merged]), session_factory, cfg).run(mode=SyncMode.FULL)
+
+    summary = _null_orch(FakeSource([]), session_factory, cfg).run(mode=SyncMode.FULL)
+
+    assert summary.marked_stale == 1
+    row = _state(session_factory, merged.primary_key())
+    assert row is not None
+    assert row.closed_reason is ClosureReason.STALE
+    assert row.purged_at is not None  # the durable "this was NOT a fix" marker
+
+
+def test_jira_disabled_config_allows_missing_project() -> None:
+    cfg = QjsyncConfig(jira=JiraConfig(enabled=False))
+    assert cfg.jira.enabled is False
+    assert cfg.jira.project == ""
+
+
+def test_jira_enabled_requires_project() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        JiraConfig(enabled=True, project="")

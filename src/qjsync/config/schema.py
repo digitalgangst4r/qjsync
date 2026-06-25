@@ -226,7 +226,11 @@ class QualysConfig(BaseModel):
 class JiraConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    project: str
+    # When false, qjsync runs in dashboard-only mode: the full detection lifecycle
+    # (open/fixed/stale) is written to the state store, but NO Jira call is ever made
+    # and Jira credentials are not required. The qjsync-dash service reads that state.
+    enabled: bool = True
+    project: str = ""
     issue_type: str = "Host Vulnerability"
     primary_key_field: str = "Primary Key"
     # Transitions / resolutions for the lifecycle. Names are resolved to ids at runtime.
@@ -248,6 +252,13 @@ class JiraConfig(BaseModel):
         default_factory=lambda: ["Won't Do", "Won't Fix", "Risk Accepted"]
     )
     requests_per_second: float = 8.0
+
+    @model_validator(mode="after")
+    def _require_project_when_enabled(self) -> JiraConfig:
+        """``project`` is mandatory only when Jira is enabled (it scopes issue creation)."""
+        if self.enabled and not self.project:
+            raise ValueError("jira.project is required when jira.enabled is true")
+        return self
 
 
 class DriftConfig(BaseModel):
